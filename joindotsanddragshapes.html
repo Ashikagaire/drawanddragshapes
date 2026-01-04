@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Math Shapes Game</title>
+<style>
+body{margin:0;font-family:Arial;background:#f2f7ff;}
+h1{text-align:center;padding:15px;background:#4CAF50;color:white;}
+#container{display:flex;justify-content:center;gap:20px;margin-top:20px;align-items:flex-start;}
+#canvas{border:3px solid #333;background:white;cursor:crosshair;}
+#buttons{display:flex;flex-direction:column;gap:15px;}
+button{padding:12px;background:#4CAF50;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;}
+button:disabled{background:#ccc;cursor:not-allowed;}
+#dragShape{width:80px;height:80px;display:none;margin:10px auto;cursor:grab;}
+#shapeArea{margin-top:40px;display:flex;justify-content:center;gap:30px;}
+.dropBox{width:110px;height:90px;border:3px dashed #555;border-radius:10px;background:white;
+display:flex;align-items:center;justify-content:center;}
+.shapeName{text-align:center;font-weight:bold;margin-bottom:5px;}
+#feedback{text-align:center;font-weight:bold;margin-top:10px;}
+#feedbackRow{text-align:center;margin-top:15px;font-weight:bold;height:24px;}
+#lessonCompleted{text-align:center;font-weight:bold;margin-top:20px;font-size:24px;color:green;display:none;}
+</style>
+</head>
+
+<body>
+<h1>Join the Dots & Match the Shape</h1>
+
+<div id="container">
+<div id="buttons">
+<button id="nextBtn" onclick="nextShape()">Next Shape</button>
+<button id="resetBtn" onclick="reset()">Reset</button>
+<button id="replayBtn" onclick="replay()">Replay</button>
+<button id="checkBtn" onclick="checkShape()">Check Shape</button>
+</div>
+
+<div style="position:relative;">
+<canvas id="canvas" width="320" height="320"></canvas>
+<img id="dragShape" draggable="true">
+<div id="feedback"></div>
+</div>
+</div>
+
+<div id="shapeArea">
+<div>
+<div class="shapeName">Triangle</div>
+<div class="dropBox" data-shape="Triangle"></div>
+</div>
+<div>
+<div class="shapeName">Square</div>
+<div class="dropBox" data-shape="Square"></div>
+</div>
+<div>
+<div class="shapeName">Rectangle</div>
+<div class="dropBox" data-shape="Rectangle"></div>
+</div>
+<div>
+<div class="shapeName">Quadrilateral</div>
+<div class="dropBox" data-shape="Quadrilateral"></div>
+</div>
+</div>
+
+<!-- Centralized feedback row -->
+<div id="feedbackRow"></div>
+
+<div id="lessonCompleted">Lesson Completed!</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const dragShape = document.getElementById("dragShape");
+const feedback = document.getElementById("feedback");
+const feedbackRow = document.getElementById("feedbackRow");
+
+const nextBtn = document.getElementById("nextBtn");
+const resetBtn = document.getElementById("resetBtn");
+const replayBtn = document.getElementById("replayBtn");
+const checkBtn = document.getElementById("checkBtn");
+const lessonCompleted = document.getElementById("lessonCompleted");
+
+let shapes = [
+ {name:"Triangle",dots:[[160,60],[80,260],[240,260]],edges:[[0,1],[1,2],[2,0]]},
+ {name:"Square",dots:[[80,80],[240,80],[240,240],[80,240]],edges:[[0,1],[1,2],[2,3],[3,0]]},
+ {name:"Rectangle",dots:[[60,100],[260,100],[260,220],[60,220]],edges:[[0,1],[1,2],[2,3],[3,0]]},
+ {name:"Quadrilateral",dots:[[120,60],[260,140],[200,260],[60,160]],edges:[[0,1],[1,2],[2,3],[3,0]]}
+];
+
+let current=0, connected=[], isDrawing=false, startDot=null, canDraw=true;
+
+// ---------- DRAW ----------
+function draw(check=false){
+ ctx.clearRect(0,0,320,320);
+ shapes[current].dots.forEach(p=>{
+  ctx.beginPath();ctx.arc(p[0],p[1],6,0,Math.PI*2);
+  ctx.fillStyle="blue";ctx.fill();
+ });
+ connected.forEach(l=>{
+  let col="black";
+  if(check){
+   let ok=shapes[current].edges.some(e=>{
+    let a=shapes[current].dots[e[0]],b=shapes[current].dots[e[1]];
+    return(l[0]==a&&l[1]==b)||(l[0]==b&&l[1]==a);
+   });
+   col=ok?"green":"red";
+  }
+  ctx.beginPath();ctx.moveTo(...l[0]);ctx.lineTo(...l[1]);
+  ctx.strokeStyle=col;
+  ctx.lineWidth=4;
+  ctx.stroke();
+ });
+}
+draw();
+
+// ---------- DRAWING ----------
+canvas.onmousedown=e=>{
+ if(!canDraw) return;
+ let r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ let i=shapes[current].dots.findIndex(p=>Math.hypot(p[0]-x,p[1]-y)<10);
+ if(i!=-1){isDrawing=true;startDot=i;}
+}
+canvas.onmousemove=e=>{
+ if(!isDrawing) return;
+ draw();
+ let r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ ctx.beginPath();
+ ctx.moveTo(...shapes[current].dots[startDot]);
+ ctx.lineTo(x,y);
+ ctx.strokeStyle="black";
+ ctx.lineWidth=4;
+ ctx.stroke();
+}
+canvas.onmouseup=e=>{
+ if(!isDrawing) return;
+ let r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+ let j=shapes[current].dots.findIndex(p=>Math.hypot(p[0]-x,p[1]-y)<10);
+ if(j!=-1&&j!=startDot) connected.push([shapes[current].dots[startDot],shapes[current].dots[j]]);
+ isDrawing=false;
+ draw();
+}
+
+// ---------- CHECK ----------
+function checkShape(){
+ if(!canDraw) return;
+ let wrong=false;
+ shapes[current].edges.forEach(e=>{
+  let a=shapes[current].dots[e[0]],b=shapes[current].dots[e[1]];
+  if(!connected.some(l=>(l[0]==a&&l[1]==b)||(l[0]==b&&l[1]==a))) wrong=true;
+ });
+ connected.forEach(l=>{
+  if(!shapes[current].edges.some(e=>{
+   let a=shapes[current].dots[e[0]],b=shapes[current].dots[e[1]];
+   return(l[0]==a&&l[1]==b)||(l[0]==b&&l[1]==a);
+  })) wrong=true;
+ });
+ draw(true);
+ if(wrong){feedback.textContent="❌ Incorrect";feedback.style.color="red";canDraw=false;}
+ else{
+   feedback.textContent="✔ Correct!";feedback.style.color="green";showShape();
+   checkLessonCompleted();
+ }
+}
+
+// ---------- DRAG ----------
+function showShape(){
+ let c=document.createElement("canvas");c.width=80;c.height=80;
+ let x=c.getContext("2d");
+ x.beginPath();
+ shapes[current].dots.forEach((p,i)=>{let X=p[0]/4,Y=p[1]/4;if(i==0)x.moveTo(X,Y);else x.lineTo(X,Y);});
+ x.closePath();x.fillStyle="orange";x.fill();
+ dragShape.src=c.toDataURL();dragShape.dataset.shape=shapes[current].name;dragShape.style.display="block";
+}
+
+dragShape.ondragstart=e=>e.dataTransfer.setData("text",dragShape.dataset.shape);
+
+// ---------- DROP (wrong drops turn red temporarily) ----------
+document.querySelectorAll(".dropBox").forEach((box)=>{
+ box.ondragover=e=>e.preventDefault();
+ box.ondrop=e=>{
+   let s=e.dataTransfer.getData("text");
+   if(s==box.dataset.shape){
+     box.innerHTML=`<img src="${dragShape.src}" width="60">`;
+     box.style.background="#c8f7c5"; // green for correct
+     feedbackRow.textContent=`✔ ${s} placed correctly!`;
+     feedbackRow.style.color="green";
+     dragShape.style.display="none";
+     checkLessonCompleted();
+   }else{
+     box.style.background="#f7c5c5"; // red for wrong
+     feedbackRow.textContent=`❌ ${s} placed incorrectly!`;
+     feedbackRow.style.color="red";
+   }
+ };
+});
+
+// ---------- CONTROLS ----------
+function clearDropFeedback(){
+  feedbackRow.textContent = "";
+}
+
+function nextShape(){
+ current=(current+1)%shapes.length;
+ connected=[];canDraw=true;feedback.textContent="";
+ dragShape.style.display="none";
+ // Clear only temporary red backgrounds, keep correct ones
+ document.querySelectorAll(".dropBox").forEach(box=>{
+   if(box.style.background==="rgb(247, 197, 197)"){ // temporary red
+     box.style.background="white";
+   }
+ });
+ clearDropFeedback();
+ draw();
+}
+
+function reset(){
+ connected=[];canDraw=true;feedback.textContent="";
+ dragShape.style.display="none";
+ clearDropFeedback();
+ draw();
+}
+
+function replay(){
+  lessonCompleted.style.display="none";
+  current=0;
+  connected=[];canDraw=true;feedback.textContent="";
+  dragShape.style.display="none";
+
+  document.querySelectorAll(".dropBox").forEach(b=>{b.innerHTML="";b.style.background="white";});
+  clearDropFeedback();
+
+  nextBtn.disabled=false;
+  resetBtn.disabled=false;
+  checkBtn.disabled=false;
+
+  shuffleShapeUnits();
+  draw();
+}
+
+function shuffleShapeUnits() {
+  const shapeArea = document.getElementById("shapeArea");
+  const units = Array.from(shapeArea.children);
+  for (let i = units.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [units[i], units[j]] = [units[j], units[i]];
+  }
+  units.forEach(unit => shapeArea.appendChild(unit));
+}
+// ---------- LESSON COMPLETED ----------
+function checkLessonCompleted(){
+ const allCorrect = Array.from(document.querySelectorAll(".dropBox")).every(box=>{
+   const bg = window.getComputedStyle(box).backgroundColor;
+   return bg==="rgb(200, 247, 197)"; // green boxes
+ });
+
+ if(allCorrect){
+   nextBtn.disabled = true;    // disable other buttons
+   resetBtn.disabled = true;
+   checkBtn.disabled = true;
+   replayBtn.disabled = false; // enable only replay
+   feedback.textContent = "";
+   feedbackRow.textContent = ""; // <-- clear last drop feedback immediately
+   lessonCompleted.textContent = "✔ All the shapes placed correctly!";
+   lessonCompleted.style.display = "block"; // show immediately
+ }
+}
+
+shuffleShapeUnits();
+</script>
+</body>
+</html>
